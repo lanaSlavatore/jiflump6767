@@ -1,0 +1,6 @@
+{
+  "sources": [
+    { "name": "Atmosphere", "repo": "Atmosphere-NX/Atmosphere", "asset": "atmosphere-.*\\.zip" },
+    { "name": "Hekate",     "repo": "CTCaer/hekate",            "asset": "hekate_ctcaer_.*\\.zip" }
+  ]
+}
