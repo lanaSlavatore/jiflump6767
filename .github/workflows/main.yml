@@ -1,35 +1,52 @@
 name: build
+
 on: [push, workflow_dispatch]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64
     steps:
       - uses: actions/checkout@v4
+
       - name: Install libs
         run: |
           for p in switch-pkg-config switch-sdl2 switch-sdl2_ttf switch-curl switch-zlib switch-harfbuzz switch-freetype switch-mbedtls switch-bzip2 switch-libpng; do
-            dkp-pacman -S --noconfirm --needed $p || echo "MISSING $p"
+            dkp-pacman -S --noconfirm --needed "$p" || echo "MISSING $p"
           done
+
       - name: Add json, minizip, font, certificates
         run: |
-          apt-get update && apt-get install -y curl fonts-noto-core
-          P=$DEVKITPRO/portlibs/switch
-          mkdir -p $P/include/nlohmann $P/include/minizip
-          curl -L https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -o $P/include/nlohmann/json.hpp
+          set -e
+          apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-core
+          P="$DEVKITPRO/portlibs/switch"
+          mkdir -p "$P/include/nlohmann" "$P/include/minizip" "$P/lib"
+          curl -fsSL https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -o "$P/include/nlohmann/json.hpp"
+
           cd /tmp
-          curl -L https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz | tar xz
+          curl -fsSL https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz | tar xz
           cd zlib-1.3.1/contrib/minizip
-          cp unzip.h ioapi.h $P/include/minizip/
-          $DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc -O2 -D__SWITCH__ -DUSE_FILE32API -DNOUNCRYPT -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -I$P/include -c unzip.c ioapi.c
-          $DEVKITPRO/devkitA64/bin/aarch64-none-elf-ar rcs $P/lib/libminizip.a unzip.o ioapi.o
-          cd $GITHUB_WORKSPACE
+          cp unzip.h ioapi.h "$P/include/minizip/"
+          "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc" \
+            -O2 -D__SWITCH__ -DUSE_FILE32API -DNOUNCRYPT \
+            -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE \
+            -I"$P/include" -I"$P/include/minizip" \
+            -c unzip.c ioapi.c
+          "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-ar" rcs "$P/lib/libminizip.a" unzip.o ioapi.o
+
+          cd "$GITHUB_WORKSPACE"
           mkdir -p romfs/fonts
-          F=$(find /usr/share/fonts -name 'NotoSansArabic*.ttf' ! -name '*UI*' | head -1)
+          F=$(find /usr/share/fonts -name 'NotoSansArabic*.ttf' ! -name '*UI*' | head -n 1)
+          if [ -z "$F" ]; then
+            echo "Error: NotoSansArabic font not found"
+            exit 1
+          fi
           cp "$F" romfs/fonts/NotoSansArabic-Regular.ttf
-          curl -L https://curl.se/ca/cacert.pem -o romfs/cacert.pem
+          curl -fsSL https://curl.se/ca/cacert.pem -o romfs/cacert.pem
+
       - name: Build
         run: make
+
       - uses: actions/upload-artifact@v4
         with:
           name: myupdater
