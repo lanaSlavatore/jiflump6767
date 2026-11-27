@@ -11,14 +11,15 @@ jobs:
 
       - name: Install libs
         run: |
+          set -e
           for p in switch-pkg-config switch-sdl2 switch-sdl2_ttf switch-curl switch-zlib switch-harfbuzz switch-freetype switch-mbedtls switch-bzip2 switch-libpng; do
-            dkp-pacman -S --noconfirm --needed "$p" || echo "MISSING $p"
+            dkp-pacman -S --noconfirm --needed "$p"
           done
 
       - name: Add json, minizip, font, certificates
         run: |
           set -e
-          apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-core
+          apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-core && rm -rf /var/lib/apt/lists/*
           P="$DEVKITPRO/portlibs/switch"
           mkdir -p "$P/include/nlohmann" "$P/include/minizip" "$P/lib"
           curl -fsSL https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -o "$P/include/nlohmann/json.hpp"
